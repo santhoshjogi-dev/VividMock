@@ -1,65 +1,106 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import "./App.css";
 
+const API_URL = "http://localhost:8080/api";
+
 function App() {
+  const [interviews, setInterviews] = useState([]);
+  const [candidates, setCandidates] = useState([]);
   const [selectedInterview, setSelectedInterview] = useState(null);
+  const [evaluations, setEvaluations] = useState([]);
 
-  // Sample data for frontend development
-  const interviews = [
-    {
-      id: 1,
-      type: "Technical Interview",
-      role: "Software Developer",
-      date: "05 Oct 2026",
-      score: 82,
-      status: "Completed",
-      duration: "35 minutes",
-      strengths: ["Problem Solving", "Java Fundamentals", "Communication"],
-      improvements: ["System Design", "Time Complexity"],
-      feedback:
-        "Good understanding of programming fundamentals. You demonstrated strong problem-solving skills but need improvement in system design.",
-    },
-    {
-      id: 2,
-      type: "HR Interview",
-      role: "Software Developer",
-      date: "28 Sep 2026",
-      score: 76,
-      status: "Completed",
-      duration: "25 minutes",
-      strengths: ["Confidence", "Communication", "Teamwork"],
-      improvements: ["Answer Structure", "Leadership Examples"],
-      feedback:
-        "You communicated confidently and demonstrated good teamwork. Try structuring your answers with more specific examples.",
-    },
-    {
-      id: 3,
-      type: "Technical Interview",
-      role: "Frontend Developer",
-      date: "20 Sep 2026",
-      score: 88,
-      status: "Completed",
-      duration: "40 minutes",
-      strengths: ["React", "JavaScript", "Problem Solving"],
-      improvements: ["Performance Optimization"],
-      feedback:
-        "Excellent technical performance. You showed strong frontend development knowledge and handled most questions confidently.",
-    },
-  ];
+  const [loading, setLoading] = useState(true);
+  const [resultsLoading, setResultsLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [resultsError, setResultsError] = useState("");
 
-  const getScoreClass = (score) => {
-    if (score >= 85) return "excellent";
-    if (score >= 70) return "good";
-    return "average";
+  // Fetch interview and candidate records
+  useEffect(() => {
+    const fetchRecords = async () => {
+      try {
+        setLoading(true);
+        setError("");
+
+        const [interviewResponse, candidateResponse] =
+          await Promise.all([
+            fetch(`${API_URL}/interviews`),
+            fetch(`${API_URL}/candidates`),
+          ]);
+
+        if (!interviewResponse.ok || !candidateResponse.ok) {
+          throw new Error("Unable to retrieve records from the server.");
+        }
+
+        const interviewData = await interviewResponse.json();
+        const candidateData = await candidateResponse.json();
+
+        setInterviews(interviewData);
+        setCandidates(candidateData);
+      } catch (err) {
+        setError(
+          "Could not connect to the backend. Make sure Spring Boot is running."
+        );
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchRecords();
+  }, []);
+
+  // Find candidate name using candidateId
+  const getCandidateName = (candidateId) => {
+    const candidate = candidates.find(
+      (item) => item.id === candidateId
+    );
+
+    return candidate ? candidate.name : `Candidate #${candidateId}`;
+  };
+
+  // Fetch evaluations for the selected interview
+  const handleViewResults = async (interview) => {
+    setSelectedInterview(interview);
+    setEvaluations([]);
+    setResultsError("");
+    setResultsLoading(true);
+
+    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    try {
+      const response = await fetch(
+        `${API_URL}/evaluations/interview/${interview.id}`
+      );
+
+      if (!response.ok) {
+        throw new Error("Unable to retrieve interview evaluations.");
+      }
+
+      const data = await response.json();
+      setEvaluations(data);
+    } catch (err) {
+      setResultsError("Could not load evaluation details.");
+    } finally {
+      setResultsLoading(false);
+    }
+  };
+
+  const getStatusClass = (status) => {
+    if (!status) return "";
+
+    return status.toLowerCase() === "completed"
+      ? "completed"
+      : "other";
   };
 
   return (
     <div className="app">
       <header className="topbar">
         <div className="brand">
-          <div className="brand-icon">I</div>
-          <span>Interv<span className="brand-highlight">AI</span></span>
+          <div className="brand-icon">V</div>
+          <span>
+            Vivid<span className="brand-highlight">Mock</span>
+          </span>
         </div>
 
         <div className="topbar-right">
@@ -73,11 +114,15 @@ function App() {
           <div>
             <span className="eyebrow">YOUR RECORDS</span>
             <h1>Interview History</h1>
-            <p>Review your previous interviews, results and performance.</p>
+            <p>
+              Review your previous interviews and performance records.
+            </p>
           </div>
 
           <div className="interview-count">
-            <span className="count-number">{interviews.length}</span>
+            <span className="count-number">
+              {interviews.length}
+            </span>
             <span>Total Interviews</span>
           </div>
         </section>
@@ -86,55 +131,83 @@ function App() {
           <div className="section-heading">
             <div>
               <h2>Previous Interviews</h2>
-              <p>Your completed interview sessions</p>
+              <p>Your recorded interview sessions</p>
             </div>
-            <span className="completed-label">● All completed</span>
+
+            <span className="completed-label">
+              ● {interviews.length} Records
+            </span>
           </div>
 
-          <div className="interview-list">
-            {interviews.map((interview) => (
-              <article className="interview-card" key={interview.id}>
-                <div className="card-main">
-                  <div className="interview-icon">
-                    {interview.type === "HR Interview" ? "HR" : "TC"}
-                  </div>
+          {loading && (
+            <p className="feedback-card">
+              Loading interview records...
+            </p>
+          )}
 
-                  <div className="interview-info">
-                    <h3>{interview.type}</h3>
-                    <p>{interview.role}</p>
-                    <div className="interview-meta">
-                      <span>◷ {interview.date}</span>
-                      <span>◴ {interview.duration}</span>
+          {!loading && error && (
+            <p className="feedback-card">{error}</p>
+          )}
+
+          {!loading && !error && interviews.length === 0 && (
+            <p className="feedback-card">
+              No interview records found. Your interviews will appear here
+              once they are saved.
+            </p>
+          )}
+
+          {!loading && !error && interviews.length > 0 && (
+            <div className="interview-list">
+              {interviews.map((interview) => (
+                <article className="interview-card" key={interview.id}>
+                  <div className="card-main">
+                    <div className="interview-icon">
+                      {interview.role
+                        ? interview.role.substring(0, 2).toUpperCase()
+                        : "IV"}
+                    </div>
+
+                    <div className="interview-info">
+                      <h3>{interview.role || "Interview"}</h3>
+
+                      <p>
+                        {getCandidateName(interview.candidateId)}
+                      </p>
+
+                      <div className="interview-meta">
+                        <span>
+                          Difficulty: {interview.difficulty || "Not specified"}
+                        </span>
+                        <span>
+                          Interview ID: {interview.id}
+                        </span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="card-score">
-                  <span className="score-label">Overall score</span>
-                  <div className={`score-value ${getScoreClass(interview.score)}`}>
-                    {interview.score}
-                    <span>/100</span>
+                  <div className="card-score">
+                    <span className="score-label">Difficulty</span>
+                    <div className="score-value good">
+                      {interview.difficulty || "N/A"}
+                    </div>
                   </div>
-                </div>
 
-                <div className="card-status">
-                  <span className="status-badge">
-                    <span>●</span> {interview.status}
-                  </span>
-                </div>
+                  <div className="card-status">
+                    <span className="status-badge">
+                      ● {interview.status || "Unknown"}
+                    </span>
+                  </div>
 
-                <button
-                  className="view-button"
-                  onClick={() => {
-                    setSelectedInterview(interview);
-                    window.scrollTo({ top: 0, behavior: "smooth" });
-                  }}
-                >
-                  View Results <span>→</span>
-                </button>
-              </article>
-            ))}
-          </div>
+                  <button
+                    className="view-button"
+                    onClick={() => handleViewResults(interview)}
+                  >
+                    View Results <span>→</span>
+                  </button>
+                </article>
+              ))}
+            </div>
+          )}
         </section>
 
         {selectedInterview && (
@@ -144,13 +217,18 @@ function App() {
                 <span className="eyebrow">INTERVIEW REPORT</span>
                 <h2>Detailed Results</h2>
                 <p>
-                  {selectedInterview.type} · {selectedInterview.role}
+                  {selectedInterview.role || "Interview"} ·{" "}
+                  {getCandidateName(selectedInterview.candidateId)}
                 </p>
               </div>
 
               <button
                 className="close-button"
-                onClick={() => setSelectedInterview(null)}
+                onClick={() => {
+                  setSelectedInterview(null);
+                  setEvaluations([]);
+                  setResultsError("");
+                }}
               >
                 ✕ Close
               </button>
@@ -158,52 +236,99 @@ function App() {
 
             <div className="result-grid">
               <div className="result-score-card">
-                <span className="score-label">Overall score</span>
-                <div className={`large-score ${getScoreClass(selectedInterview.score)}`}>
-                  {selectedInterview.score}
-                  <span>/100</span>
+                <span className="score-label">Interview ID</span>
+                <div className="large-score good">
+                  #{selectedInterview.id}
                 </div>
-                <span className="result-status">Interview completed</span>
+                <span className="result-status">
+                  {selectedInterview.status || "Status unavailable"}
+                </span>
               </div>
 
               <div className="feedback-card">
-                <h3>AI Feedback</h3>
-                <p>{selectedInterview.feedback}</p>
+                <h3>Interview Information</h3>
+                <p>
+                  <strong>Candidate:</strong>{" "}
+                  {getCandidateName(selectedInterview.candidateId)}
+                </p>
+                <p>
+                  <strong>Role:</strong>{" "}
+                  {selectedInterview.role || "Not specified"}
+                </p>
+                <p>
+                  <strong>Difficulty:</strong>{" "}
+                  {selectedInterview.difficulty || "Not specified"}
+                </p>
+                <p>
+                  <strong>Status:</strong>{" "}
+                  {selectedInterview.status || "Not specified"}
+                </p>
               </div>
             </div>
 
-            <div className="analysis-grid">
-              <div className="analysis-card">
-                <div className="analysis-title">
-                  <span className="analysis-icon strength-icon">✓</span>
-                  <h3>Strengths</h3>
-                </div>
-
-                {selectedInterview.strengths.map((item, index) => (
-                  <div className="analysis-item" key={index}>
-                    <span>✓</span> {item}
-                  </div>
-                ))}
-              </div>
-
-              <div className="analysis-card">
-                <div className="analysis-title">
-                  <span className="analysis-icon improvement-icon">↗</span>
-                  <h3>Areas to Improve</h3>
-                </div>
-
-                {selectedInterview.improvements.map((item, index) => (
-                  <div className="analysis-item" key={index}>
-                    <span>↗</span> {item}
-                  </div>
-                ))}
+            <div className="section-heading">
+              <div>
+                <h2>Evaluation Details</h2>
+                <p>Question-wise evaluation records</p>
               </div>
             </div>
+
+            {resultsLoading && (
+              <p className="feedback-card">
+                Loading evaluation details...
+              </p>
+            )}
+
+            {!resultsLoading && resultsError && (
+              <p className="feedback-card">{resultsError}</p>
+            )}
+
+            {!resultsLoading &&
+              !resultsError &&
+              evaluations.length === 0 && (
+                <p className="feedback-card">
+                  No evaluation records are available for this interview yet.
+                </p>
+              )}
+
+            {!resultsLoading &&
+              !resultsError &&
+              evaluations.length > 0 && (
+                <div className="interview-list">
+                  {evaluations.map((evaluation) => (
+                    <div className="analysis-card" key={evaluation.id}>
+                      <div className="analysis-title">
+                        <h3>
+                          Question #{evaluation.questionId}
+                        </h3>
+                        <span className="score-value good">
+                          {evaluation.score ?? "N/A"}
+                        </span>
+                      </div>
+
+                      <div className="analysis-item">
+                        <strong>Feedback:</strong>{" "}
+                        {evaluation.feedback || "No feedback available."}
+                      </div>
+
+                      <div className="analysis-item">
+                        <strong>Strengths:</strong>{" "}
+                        {evaluation.strengths || "Not provided."}
+                      </div>
+
+                      <div className="analysis-item">
+                        <strong>Areas to Improve:</strong>{" "}
+                        {evaluation.improvements || "Not provided."}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
           </section>
         )}
 
         <footer className="footer">
-          <span>IntervAI</span>
+          <span>VividMock</span>
           <span>Candidate Records & Results</span>
         </footer>
       </main>
