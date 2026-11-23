@@ -1,12 +1,14 @@
 
 import { useEffect, useState } from "react";
 import "./App.css";
+import { API_URL } from "./api";
+import CandidateRecords from "./CandidateRecords";
 
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  (import.meta.env.DEV ? "http://localhost:8080/api" : "/api");
+const getViewFromHash = () =>
+  window.location.hash === "#/candidates" ? "candidates" : "history";
 
 function App() {
+  const [view, setView] = useState(getViewFromHash);
   const [interviews, setInterviews] = useState([]);
   const [candidates, setCandidates] = useState([]);
   const [selectedInterview, setSelectedInterview] = useState(null);
@@ -48,8 +50,18 @@ function App() {
       }
     };
 
-    fetchRecords();
+    if (view === "history") fetchRecords();
+  }, [view]);
+
+  useEffect(() => {
+    const onHashChange = () => setView(getViewFromHash());
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
   }, []);
+
+  const navigate = (next) => {
+    window.location.hash = next === "candidates" ? "#/candidates" : "#/";
+  };
 
   // Find candidate name using candidateId
   const getCandidateName = (candidateId) => {
@@ -105,13 +117,33 @@ function App() {
           </span>
         </div>
 
+        <nav className="nav-tabs" aria-label="Main navigation">
+          <button
+            type="button"
+            className={view === "candidates" ? "nav-tab active" : "nav-tab"}
+            onClick={() => navigate("candidates")}
+          >
+            Candidate Records
+          </button>
+          <button
+            type="button"
+            className={view === "history" ? "nav-tab active" : "nav-tab"}
+            onClick={() => navigate("history")}
+          >
+            Interview History
+          </button>
+        </nav>
+
         <div className="topbar-right">
-          <span className="module-label">Candidate Records</span>
           <div className="avatar">S</div>
         </div>
       </header>
 
       <main className="main-container">
+        {view === "candidates" ? (
+          <CandidateRecords />
+        ) : (
+          <>
         <section className="page-heading">
           <div>
             <span className="eyebrow">YOUR RECORDS</span>
@@ -327,6 +359,9 @@ function App() {
                 </div>
               )}
           </section>
+        )}
+
+          </>
         )}
 
         <footer className="footer">
